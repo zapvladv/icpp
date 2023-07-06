@@ -3,35 +3,50 @@ name: Build and Release
 on: [push, pull_request]
 jobs:
   build:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [arm-linux-gnueabihf, aarch64-linux-gnu, x86_64-linux-gnu]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Install cross-compiler
-        run: sudo apt-get install gcc-${{ matrix.target }} g++-${{ matrix.target }}
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v1.9
+      - name: Setup Cross Compiler
+        run: |
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            sudo apt-get install gcc-mingw-w64 g++-mingw-w64 gcc-multilib g++-multilib
+          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+            brew install mingw-w64
+          fi
       - name: Configure CMake
-        run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${{ matrix.target }}-gcc -DCMAKE_CXX_COMPILER=${{ matrix.target }}-g++
-      - name: Build
-        run: cmake --build ${{ github.workspace }}/build --config Release --target hello_world -- -j 4
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        run: |
+          mkdir build && cd build
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            cmake .. -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+            cmake .. -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+          else
+            cmake ..
+          fi
+      - name: Build CMake
+        run: |
+          cd build && cmake --build .
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v2.2.4
         with:
-          name: hello_world-${{ matrix.target }}
-          path: ${{ github.workspace }}/build/hello_world
+          name: hello_world-${{ matrix.os }}
+          path: build/hello_world.exe
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-      - name: Create release
+      - name: Download Artifacts
+        uses: actions/download-artifact@v2.1.0
+      - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: actions/create-release@v1.1.4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -39,13 +54,36 @@ jobs:
           release_name: Release ${{ github.ref }}
           draft: false
           prerelease: false
-      - name: Upload release assets
+      - name: Upload Release Asset for Ubuntu
+        id: upload-release-asset-ubuntu 
         uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./hello_world-${{ matrix.target }}
-          asset_name: hello_world-${{ matrix.target }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }} 
+          asset_path: ./hello_world-ubuntu-latest/hello_world.exe 
+          asset_name: hello_world-ubuntu.exe 
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset for MacOS
+        id: upload-release-asset-macos 
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} 
+          asset_path: ./hello_world-macos-latest/hello_world.exe 
+          asset_name: hello_world-macos.exe 
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset for Windows
+        id: upload-release-asset-windows 
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} 
+          asset_path: ./hello_world-windows-latest/hello_world.exe 
+          asset_name: hello_world-windows.exe 
           asset_content_type: application/octet-stream
 
