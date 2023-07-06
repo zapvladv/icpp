@@ -1,8 +1,7 @@
-# Set the minimum required version of CMake
 cmake_minimum_required(VERSION 3.10)
 
-# Set the project name and version
-project(HelloWorld VERSION 1.0)
+project(HelloWorld)
 
-# Add an executable with the source file main.cpp
 add_executable(HelloWorld main.cpp)
+
+install(TARGETS HelloWorld DESTINATION bin)
