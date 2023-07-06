@@ -1,0 +1,38 @@
+name: Cross-compile and release HelloWorld
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install dependencies
+        run: sudo apt-get install cmake gcc-mingw-w64 g++-mingw-w64
+      - name: Create build directory
+        run: mkdir build && cd build
+      - name: Configure CMake for Windows
+        run: cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-mingw32.cmake
+      - name: Build Windows executable
+        run: cmake --build . --config Release
+      - name: Configure CMake for Linux
+        run: cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-linux.cmake
+      - name: Build Linux executable
+        run: cmake --build . --config Release
+      - name: Configure CMake for MacOS
+        run: cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-macos.cmake
+      - name: Build MacOS executable
+        run: cmake --build . --config Release
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/HelloWorld.exe
+            build/HelloWorld.out
+            build/HelloWorld.app
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
